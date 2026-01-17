@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Orthonormal Basis Finder</title>
+
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f7fb;
+      padding: 40px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      margin-bottom: 6px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    select, input {
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    .vector-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .vector-row input {
+      width: 70px;
+      text-align: center;
+    }
+
+    button {
+      padding: 8px 14px;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background: #4f46e5;
+      color: white;
+    }
+
+    button.secondary {
+      background: #e5e7eb;
+      color: #111;
+    }
+
+    button.danger {
+      background: #ef4444;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .error {
+      margin-top: 20px;
+      padding: 12px;
+      background: #fee2e2;
+      color: #991b1b;
+      border-radius: 6px;
+    }
+
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #eef2ff;
+      border-radius: 6px;
+      font-family: monospace;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Orthonormal Basis Finder</h1>
+    <p>Compute an orthonormal basis using Gram–Schmidt.</p>
+
+    <div class="controls">
+      <label>
+        Vector dimension:
+        <select id="dimension" onchange="changeDimension()">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3" selected>3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+        </select>
+      </label>
+
+      <button
+        id="addVectorBtn"
+        class="secondary"
+        onclick="addVector()"
+      >
+        Add Vector
+      </button>
+    </div>
+
+    <div id="vectors"></div>
+
+    <div class="actions">
+      <button onclick="computeBasis()">Compute Orthonormal Basis</button>
+    </div>
+
+    <div id="error" class="error" style="display:none;"></div>
+    <div id="result" class="result" style="display:none;"></div>
+  </div>
+
+  <script>
+    const MAX_VECTORS = 7;
+
+    let dimension = 3;
+    let vectors = [];
+
+    function updateAddButton() {
+      const btn = document.getElementById('addVectorBtn');
+      btn.disabled = vectors.length >= MAX_VECTORS;
+    }
+
+    function addVector() {
+      if (vectors.length >= MAX_VECTORS) return;
+
+      vectors.push(Array(dimension).fill(0));
+      renderVectors();
+      updateAddButton();
+    }
+
+    function removeVector(index) {
+      if (vectors.length > 1) {
+        vectors.splice(index, 1);
+        renderVectors();
+        updateAddButton();
+      }
+    }
+
+    function changeDimension() {
+      dimension = parseInt(document.getElementById('dimension').value, 10);
+
+      vectors = vectors.map(v => {
+        if (v.length > dimension) return v.slice(0, dimension);
+        if (v.length < dimension) return v.concat(Array(dimension - v.length).fill(0));
+        return v;
+      });
+
+      renderVectors();
+    }
+
+    function renderVectors() {
+      const container = document.getElementById('vectors');
+      container.innerHTML = '';
+
+      vectors.forEach((vector, vIndex) => {
+        const row = document.createElement('div');
+        row.className = 'vector-row';
+
+        const label = document.createElement('strong');
+        label.textContent = `v${vIndex + 1}`;
+        row.appendChild(label);
+
+        vector.forEach((value, i) => {
+          const input = document.createElement('input');
+          input.type = 'number';
+          input.value = value;
+
+          input.oninput = e => {
+            vectors[vIndex][i] = parseFloat(e.target.value) || 0;
+          };
+
+          row.appendChild(input);
+        });
+
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = 'X';
+        removeBtn.className = 'danger';
+        removeBtn.onclick = () => removeVector(vIndex);
+
+        row.appendChild(removeBtn);
+        container.appendChild(row);
+      });
+    }
+
+    function dot(a, b) {
+      return a.reduce((sum, v, i) => sum + v * b[i], 0);
+    }
+
+    function scale(v, s) {
+      return v.map(x => x * s);
+    }
+
+    function subtract(a, b) {
+      return a.map((v, i) => v - b[i]);
+    }
+
+    function norm(v) {
+      return Math.sqrt(dot(v, v));
+    }
+
+    function gramSchmidt(inputVectors) {
+      const basis = [];
+
+      for (const v of inputVectors) {
+        let u = [...v];
+
+        for (const b of basis) {
+          const proj = scale(b, dot(u, b));
+          u = subtract(u, proj);
+        }
+
+        const length = norm(u);
+        if (length === 0) continue;
+
+        basis.push(scale(u, 1 / length));
+      }
+
+      return basis;
+    }
+
+    function formatVector(v) {
+      return `[${v.map(n => n.toFixed(4)).join(', ')}]`;
+    }
+
+    function computeBasis() {
+      const errorDiv = document.getElementById('error');
+      const resultDiv = document.getElementById('result');
+
+      errorDiv.style.display = 'none';
+      resultDiv.style.display = 'none';
+
+      try {
+        if (vectors.length === 0) {
+          throw new Error('Add at least one vector');
+        }
+
+        const basis = gramSchmidt(vectors);
+
+        if (basis.length === 0) {
+          throw new Error('Vectors are linearly dependent');
+        }
+
+        resultDiv.innerHTML = basis
+          .map((v, i) => `e${i + 1} = ${formatVector(v)}`)
+          .join('<br>');
+
+        resultDiv.style.display = 'block';
+      } catch (err) {
+        errorDiv.textContent = err.message;
+        errorDiv.style.display = 'block';
+      }
+    }
+
+    // Initialize with two vectors
+    addVector();
+    addVector();
+  </script>
+
+</body>
+</html>
